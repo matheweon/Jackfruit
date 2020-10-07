@@ -5,6 +5,8 @@ var socket = io.connect("http://98.110.30.150/");
 var createJoinText = document.getElementById("createJoinText"),
     roomCode = document.getElementById("roomCode"),
     btn = document.getElementById("enter"),
+    howToPlay = document.getElementById("howToPlay"),
+    handRankingPoints = document.getElementById("handRankingPoints"),
     waitingText = document.getElementById("waitingText"),
     gameText = document.getElementById("gameText"),
     infoText = document.getElementById("info"),
@@ -26,7 +28,8 @@ var currentRoom,
     opponentHand,
     handOver = false,
     dealCardsData,
-    firstGame = true;
+    firstGame = true,
+    madeHands = [];
 
 // Focus on text box
 roomCode.focus();
@@ -43,6 +46,8 @@ btn.addEventListener("click", function(){
     createJoinText.classList.add("hidden");
     roomCode.classList.add("hidden");
     btn.classList.add("hidden");
+    howToPlay.classList.add("hidden");
+    handRankingPoints.classList.add("hidden");
     waitingText.classList.remove("hidden");
 });
 
@@ -148,6 +153,7 @@ socket.on("endGame", function(data) {
         infoText.innerHTML = infoText.innerHTML + data.info.replaceAll("\n", "<br>");
         p1pointsText.innerHTML = data.p1points;
         p2pointsText.innerHTML = data.p2points;
+        madeHands = data.madeHands;
     }
 })
 
@@ -169,6 +175,7 @@ function resetDisplay() {
     setHandButton.classList.add("setHand");
     setHandButton.classList.remove("handSet");
     setHandButton.classList.remove("nextHand");
+    setHandButton.classList.remove("hover");
     setHandButton.innerHTML = "Set Hand";
 }
 
@@ -198,7 +205,7 @@ function displayCards(data) {
 
         colorSuits();
 
-        selectable = [0, 1, 7, 8, 14, 15, 21, 22, 23, 24, 25, 26, 27, 10];
+        selectable = [0, 1, 7, 8, 14, 15, 21, 22, 23, 24, 25, 26, 27];
         allowSelectable();
         allowClickable();
     } else {
@@ -253,7 +260,7 @@ function displayCards(data) {
 
         colorSuits();
 
-        selectable = [5, 6, 12, 13, 19, 20, 21, 22, 23, 24, 25, 26, 27, 10];
+        selectable = [5, 6, 12, 13, 19, 20, 21, 22, 23, 24, 25, 26, 27];
         allowSelectable();
         allowClickable();
     }
@@ -287,6 +294,8 @@ function nextHand() {
     if (opponentReady) {
         checkMarks();
     }
+    allowSelectable();
+    allowClickable();
 }
 
 // Updates the text color of each card based on its suit
@@ -322,7 +331,54 @@ function colorSuits() {
 }
 
 function allowSelectable() {
-    if (!handSet) {
+    if (handOver) {
+        selectable = [0, 1, 5, 6, 7, 8, 12, 13, 14, 15, 19, 20]; // Both player's cards
+        gridArray.forEach(function(element) {
+            if (element.id === "10") { // next hand button
+                element.onmouseover = function() {
+                    this.classList.add("hover");
+                };
+                element.onmouseout = function() {
+                    this.classList.remove("hover");
+                };
+            } else if (selectable.includes(parseInt(element.id))) {
+                // Find which hand to display
+                var handID;
+                if (element.id === "0" || element.id === "1") {
+                    handID = 0;
+                } else if (element.id === "5" || element.id === "6") {
+                    handID = 1;
+                } else if (element.id === "7" || element.id === "8") {
+                    handID = 2;
+                } else if (element.id === "12" || element.id === "13") {
+                    handID = 3;
+                } else if (element.id === "14" || element.id === "15") {
+                    handID = 4;
+                } else {
+                    handID = 5;
+                }
+                element.onmouseover = function() {
+                    // Find all boxes with cards in fullHand
+                    gridArray.forEach(function(card) {
+                        if (madeHands[handID].includes(card.innerHTML)) {
+                            card.classList.add("selected");
+                        }
+                    });
+                };
+                element.onmouseout = function() {
+                    gridArray.forEach(function(card) {
+                        if (madeHands[handID].includes(card.innerHTML)) {
+                            card.classList.remove("selected");
+                        }
+                    });
+                };
+            } else {
+                // Make unselectable
+                element.onmouseover = function(){};
+                element.onmouseout = function(){};
+            }
+        });
+    } else if (!handSet) {
         gridArray.forEach(function(element) {
             if (selectable.includes(parseInt(element.id))) {
                 element.onmouseover = function() {
@@ -331,6 +387,10 @@ function allowSelectable() {
                 element.onmouseout = function() {
                     this.classList.remove("hover");
                 };
+            } else {
+                // Make unselectable
+                element.onmouseover = function(){};
+                element.onmouseout = function(){};
             }
         });
     } else {
@@ -342,19 +402,28 @@ function allowSelectable() {
 }
 
 function allowClickable() {
-    if (!handSet) {
+    // Only allow next hand button to be clicked when hand is over
+    if (handOver) {
+        gridArray.forEach(function(element) {
+            if (element.id === "10") {
+                element.style.cursor = "pointer";
+                element.onclick = function() {
+                    handOver = false;
+                    nextHand();
+                }
+            } else {
+                element.style.cursor = "default";
+                element.onclick = function(){};
+            }
+        });
+    } else if (!handSet) {
         gridArray.forEach(function(element) {
             if (selectable.includes(parseInt(element.id))) {
                 element.style.cursor = "pointer";
                 element.onclick = function() {
                     if (element.id === "10") {
-                        if (handOver === true) {
-                            nextHand();
-                            handOver = false;
-                        } else {
-                            setHand();
-                            handOver = true;
-                        }
+                        setHand();
+                        handOver = true;
                     } else {
                         if (selected === undefined) {
                             // Select first element
@@ -368,9 +437,40 @@ function allowClickable() {
                             selected.classList.remove("selected");
                             selected = undefined;
                             colorSuits();
+                            // Allow set hand button to be clicked if all six cards are set
+                            var cards = [];
+                            if (playerNum === 1) {
+                                cards.push(gridArray[0].innerHTML);
+                                cards.push(gridArray[1].innerHTML);
+                                cards.push(gridArray[7].innerHTML);
+                                cards.push(gridArray[8].innerHTML);
+                                cards.push(gridArray[14].innerHTML);
+                                cards.push(gridArray[15].innerHTML);
+                            } else {
+                                cards.push(gridArray[5].innerHTML);
+                                cards.push(gridArray[6].innerHTML);
+                                cards.push(gridArray[12].innerHTML);
+                                cards.push(gridArray[13].innerHTML);
+                                cards.push(gridArray[19].innerHTML);
+                                cards.push(gridArray[20].innerHTML);
+                            }
+                            if (!cards.includes("")) {
+                                if (selectable.indexOf(10) === -1) {
+                                    selectable.push(10);
+                                    allowSelectable();
+                                    allowClickable();
+                                }
+                            } else if (selectable.indexOf(10) !== -1) {
+                                selectable.splice(selectable.indexOf(10), 1);
+                                allowSelectable();
+                                allowClickable();
+                            }
                         }
                     }
                 };
+            } else {
+                element.style.cursor = "default";
+                element.onclick = function(){};
             }
         });
     } else {

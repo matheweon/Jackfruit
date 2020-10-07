@@ -38,6 +38,10 @@ io.on("connection", (socket) => {
         console.log("Game started with code", data.roomCode);
         socket.broadcast.emit("startGame", data);
         startGame(data.roomCode);
+        if (data.roomCode in gamesDictionary) {
+            gamesDictionary[data.roomCode]["p1points"] = 0;
+            gamesDictionary[data.roomCode]["p2points"] = 0;
+        }
     });
 
     // Handle setHand event
@@ -64,6 +68,13 @@ var fullDeck = [
     "2♦", "3♦", "4♦", "5♦", "6♦", "7♦", "8♦", "9♦", "T♦", "J♦", "Q♦", "K♦", "A♦",
     "2♥", "3♥", "4♥", "5♥", "6♥", "7♥", "8♥", "9♥", "T♥", "J♥", "Q♥", "K♥", "A♥",
     "2♠", "3♠", "4♠", "5♠", "6♠", "7♠", "8♠", "9♠", "T♠", "J♠", "Q♠", "K♠", "A♠"
+]
+
+var shortDeck = [
+    "6♣", "7♣", "8♣", "9♣", "T♣", "J♣", "Q♣", "K♣", "A♣",
+    "6♦", "7♦", "8♦", "9♦", "T♦", "J♦", "Q♦", "K♦", "A♦",
+    "6♥", "7♥", "8♥", "9♥", "T♥", "J♥", "Q♥", "K♥", "A♥",
+    "6♠", "7♠", "8♠", "9♠", "T♠", "J♠", "Q♠", "K♠", "A♠"
 ]
 
 // Prevent suits from coverting to emojis on iPhone (DOESNT EVEN WORK LOL)
@@ -153,6 +164,37 @@ function convertToNumbers(inputArray) {
     }
 }
 
+// Returns full hand in the form [ 'Q♣', '9♥', '8♠', '3♦', '4♠' ]
+function findFullHand(ranks, lookFor) {
+    var fullHand = [];
+    lookFor.forEach(function(rank) {
+        if (fullHand.length === 5) {
+            return fullHand;
+        } else {
+            // Convert rank to number
+            if (rank === 10) {
+                rank = "T";
+            } else if (rank === 11) {
+                rank = "J";
+            } else if (rank === 12) {
+                rank = "Q";
+            } else if (rank === 13) {
+                rank = "K";
+            } else if (rank === 14) {
+                rank = "A";
+            }
+            ranks[rank].forEach(function(card) {
+                if (fullHand.length === 5) {
+                    return fullHand;
+                } else {
+                    fullHand.push(card);
+                }
+            });
+        }
+    });
+    return fullHand;
+}
+
 function findMultipleCards(cards) {
     // Number of times each card occurs; 1 - no pair, 2 - pair, 3 - trips, 4 - quads
     var occurances = {
@@ -161,7 +203,22 @@ function findMultipleCards(cards) {
         3: [],
         4: []
     }
-    //console.log(cards);
+    // Stores the suited card string for each rank
+    var ranks = {
+        "2": [],
+        "3": [],
+        "4": [],
+        "5": [],
+        "6": [],
+        "7": [],
+        "8": [],
+        "9": [],
+        "T": [],
+        "J": [],
+        "Q": [],
+        "K": [],
+        "A": []
+    }
     cards.forEach(function(card) {
         if (occurances[3].includes(card[0])) {
             occurances[3].splice(occurances[3].indexOf(card[0]), 1);
@@ -175,74 +232,114 @@ function findMultipleCards(cards) {
         } else {
             occurances[1].push(card[0]);
         }
+        ranks[card[0]].push(card);
     });
     convertToNumbers(occurances[1]);
     convertToNumbers(occurances[2]);
     convertToNumbers(occurances[3]);
-    occurances[1].sort((a, b) => b - a); // Sorts in decenending order
+    occurances[1].sort((a, b) => b - a); // Sorts in descending order
     occurances[2].sort((a, b) => b - a);
     occurances[3].sort((a, b) => b - a);
 
     if (occurances[4].length === 1) { // Four of a Kind
         if (occurances[3].length === 1) { // Trips acts as kicker
-            return [7, occurances[4][0], occurances[3][0]];
+            return [7, occurances[4][0], occurances[3][0], findFullHand(ranks, [occurances[4][0], occurances[3][0]])];
         } else if (occurances[2].length === 1) {
             if (occurances[2][0] >= occurances[1][0]) { // Pair acts as kicker
-                return [7, occurances[4][0], occurances[2][0]];
+                return [7, occurances[4][0], occurances[2][0], findFullHand(ranks, [occurances[4][0], occurances[2][0]])];
             } else { // High Card acts as kicker
-                return [7, occurances[4][0], occurances[1][0]];
+                return [7, occurances[4][0], occurances[1][0], findFullHand(ranks, [occurances[4][0], occurances[1][0]])];
             }
         } else { // High Card kicker
-            return [7, occurances[4][0], occurances[1][0]];
+            return [7, occurances[4][0], occurances[1][0], findFullHand(ranks, [occurances[4][0], occurances[1][0]])];
         }
     } else if (occurances[3].length === 2) { // Full House made from two trips
-        return [6, occurances[3][0], occurances[3][1]];
+        return [6, occurances[3][0], occurances[3][1], findFullHand(ranks, [occurances[3][0], occurances[3][1]])];
     } else if (occurances[3].length === 1 && occurances[2].length >= 1) { // Full House made from trips and a pair
-        return [6, occurances[3][0], occurances[2][0]];
+        return [6, occurances[3][0], occurances[2][0], findFullHand(ranks, [occurances[3][0], occurances[2][0]])];
     } else if (occurances[3].length === 1) { // Three of a kind
-        return [3, occurances[3][0], occurances[1][0], occurances[1][1]];
+        return [3, occurances[3][0], occurances[1][0], occurances[1][1], findFullHand(ranks, [occurances[3][0], occurances[1][0], occurances[1][1]])];
     } else if (occurances[2].length === 3) { // Two pair mode from three pairs (lowest pair acts as kicker)
-        return [2, occurances[2][0], occurances[2][1], occurances[2][2]];
+        return [2, occurances[2][0], occurances[2][1], occurances[2][2], findFullHand(ranks, [occurances[2][0], occurances[2][1], occurances[2][2]])];
     } else if (occurances[2].length === 2) { // Two pair mode from two pairs and a high card
-        return [2, occurances[2][0], occurances[2][1], occurances[1][0]];
+        return [2, occurances[2][0], occurances[2][1], occurances[1][0], findFullHand(ranks, [occurances[2][0], occurances[2][1], occurances[1][0]])];
     } else if (occurances[2].length === 1) { // One pair
-        return [1, occurances[2][0], occurances[1][0], occurances[1][1], occurances[1][2]];
+        return [1, occurances[2][0], occurances[1][0], occurances[1][1], occurances[1][2], findFullHand(ranks, [occurances[2][0], occurances[1][0], occurances[1][1], occurances[1][2]])];
     } else { // High Card
-        return [0, occurances[1][0], occurances[1][1], occurances[1][2], occurances[1][3], occurances[1][4]];
+        return [0, occurances[1][0], occurances[1][1], occurances[1][2], occurances[1][3], occurances[1][4], findFullHand(ranks, [occurances[1][0], occurances[1][1], occurances[1][2], occurances[1][3], occurances[1][4]])];
     }
 }
 
 function findFlush(cards) {
     suits = {
-        "club": [],
-        "diamond": [],
-        "heart": [],
-        "spade": []
+        "♣": [],
+        "♦": [],
+        "♥": [],
+        "♠": []
     }
     cards.forEach(function(card) {
-        if (card[1] === "♣") {
-            suits["club"].push(card[0]);
-        } else if (card[1] === "♦") {
-            suits["diamond"].push(card[0]);
-        } else if (card[1] === "♥") {
-            suits["heart"].push(card[0]);
-        } else {
-            suits["spade"].push(card[0]);
-        }
+        suits[card[1]].push(card[0]);
     });
     for (var suit in suits) {
         if (suits[suit].length >= 5) {
             convertToNumbers(suits[suit]);
-            suits[suit].sort((a, b) => b - a); // Decenending sort
+            suits[suit].sort((a, b) => b - a); // Descending sort
             // Search for Straight Flush
             var straightFlush = findStraight(suits[suit]);
             if (straightFlush !== false) {
                 if (straightFlush[1] === 14) {
-                    return [9]; // Royal Flush
+                    var fullHand = ["A", "K", "Q", "J", "T"];
+                    for (var i = 0; i < 5; i++) {
+                        fullHand[i] += suit;
+                    }
+                    console.log("Royal Flush: " + fullHand);
+                    return [9, fullHand]; // Royal Flush
+                } else if (straightFlush[1] === 5) { // Wheel Flush
+                    var fullHand = ["A", "2", "3", "4", "5"];
+                    for (var i = 0; i < 5; i++) {
+                        fullHand[i] += suit;
+                    }
+                    console.log("Wheel Flush: " + fullHand);
+                    return [8, straightFlush[1], fullHand];
+                } else {
+                    var fullHand = [straightFlush[1], straightFlush[1]-1, straightFlush[1]-2, straightFlush[1]-3, straightFlush[1]-4];
+                    for (var i = 0; i < 5; i++) {
+                        // Convert rank to number
+                        if (fullHand[i] === 10) {
+                            fullHand[i] = "T";
+                        } else if (fullHand[i] === 11) {
+                            fullHand[i] = "J";
+                        } else if (fullHand[i] === 12) {
+                            fullHand[i] = "Q";
+                        } else if (fullHand[i] === 13) {
+                            fullHand[i] = "K";
+                        } else if (fullHand[i] === 14) {
+                            fullHand[i] = "A";
+                        }
+                        fullHand[i] += suit;
+                    }
+                    console.log("Straight Flush: " + fullHand);
+                    return [8, straightFlush[1], fullHand];
                 }
-                return [8, straightFlush[1]];
             }
-            return [5, suits[suit][0], suits[suit][1], suits[suit][2], suits[suit][3], suits[suit][4]];
+            // Get top five cards in flush
+            var fullHand = suits[suit].slice(0, 5);
+            for (var i = 0; i < 5; i++) {
+                // Convert rank to number
+                if (fullHand[i] === 10) {
+                    fullHand[i] = "T";
+                } else if (fullHand[i] === 11) {
+                    fullHand[i] = "J";
+                } else if (fullHand[i] === 12) {
+                    fullHand[i] = "Q";
+                } else if (fullHand[i] === 13) {
+                    fullHand[i] = "K";
+                } else if (fullHand[i] === 14) {
+                    fullHand[i] = "A";
+                }
+                fullHand[i] += suit;
+            }
+            return [5, suits[suit][0], suits[suit][1], suits[suit][2], suits[suit][3], suits[suit][4], fullHand];
         }
     }
     return false;
@@ -256,12 +353,20 @@ function findStraight(cards) {
     convertToNumbers(suitlessCards);
     for (var i = 14; i > 5; i--) {
         if (suitlessCards.includes(i) && suitlessCards.includes(i-1) && suitlessCards.includes(i-2) && suitlessCards.includes(i-3) && suitlessCards.includes(i-4)) {
-            return [4, i];
+            var fullHand = [i, i-1, i-2, i-3, i-4];
+            for (var i = 0; i < 5; i++) {
+                fullHand[i] = cards[suitlessCards.indexOf(fullHand[i])];
+            }
+            return [4, i, fullHand];
         }
     }
     // Special case for Wheel (A2345)
     if (suitlessCards.includes(14) && suitlessCards.includes(2) && suitlessCards.includes(3) && suitlessCards.includes(4) && suitlessCards.includes(5)) {
-        return [4, 5];
+        var fullHand = [14, 2, 3, 4, 5];
+        for (var i = 0; i < 5; i++) {
+            fullHand[i] = cards[suitlessCards.indexOf(fullHand[i])];
+        }
+        return [4, 5, fullHand];
     }
     return false;
 }
@@ -444,6 +549,7 @@ function river(roomCode) {
 
 function endRound(roomCode) {
     winningHands = [];
+    madeHands = [];
     community = gamesDictionary[roomCode]["flop"].slice()
     community.push(gamesDictionary[roomCode]["turn"]);
     community.push(gamesDictionary[roomCode]["river"]);
@@ -464,8 +570,13 @@ function endRound(roomCode) {
             var points = rankingPoints[winningHand[0]] * multipliers[i];
             winningHands.push([2, winningHand, points]);
         } else {
-            winningHands.push([0]);
+            // Still show the hand that they tied with
+            var winningHand = findHand(hand1.concat(community));
+            winningHands.push([0, winningHand]);
         }
+        // Push each fullHand into madeHands
+        madeHands.push(findHand(hand1.concat(community))[findHand(hand1.concat(community)).length - 1]);
+        madeHands.push(findHand(hand2.concat(community))[findHand(hand2.concat(community)).length - 1]);
     }
     console.log(winningHands);
     // Calculate total score and if a player scoops
@@ -492,17 +603,17 @@ function endRound(roomCode) {
     }
     // Write top, mid, bot info
     if (winningHands[0][0] === 0) { // If tie
-        topInfo = "Top Hand is a tie\n";
+        topInfo = "Top Hand is a tie with " + handName(winningHands[0][1]) + "\n";
     } else {
         topInfo = "Player " + winningHands[0][0] + " wins Top Hand with " + handName(winningHands[0][1]) + ". " + winningHands[0][2]/multipliers[0] + "x" + multipliers[0] + " = +" + winningHands[0][2] + " Points\n";
     }
     if (winningHands[1][0] === 0) { // If tie
-        midInfo = "Middle Hand is a tie\n";
+        midInfo = "Middle Hand is a tie with " + handName(winningHands[1][1]) + "\n";
     } else {
         midInfo = "Player " + winningHands[1][0] + " wins Middle Hand with " + handName(winningHands[1][1]) + ". " + winningHands[1][2]/multipliers[1] + "x" + multipliers[1] + " = +" + winningHands[1][2] + " Points\n";
     }
     if (winningHands[2][0] === 0) { // If tie
-        botInfo = "Bottom Hand is a tie\n";
+        botInfo = "Bottom Hand is a tie with " + handName(winningHands[2][1]) + "\n";
     } else {
         botInfo = "Player " + winningHands[2][0] + " wins Bottom Hand with " + handName(winningHands[2][1]) + ". " + winningHands[2][2]/multipliers[2] + "x" + multipliers[2] + " = +" + winningHands[2][2] + " Points\n";
     }
@@ -530,11 +641,13 @@ function endRound(roomCode) {
     }
     var info = topInfo + midInfo + botInfo + winInfo;
     console.log(info);
+    console.log("Made Hands: " + madeHands);
     io.sockets.emit("endGame", {
         roomCode: roomCode,
         info: info,
         p1points: gamesDictionary[roomCode]["p1points"],
-        p2points: gamesDictionary[roomCode]["p2points"]
+        p2points: gamesDictionary[roomCode]["p2points"],
+        madeHands: madeHands
     });
 
     io.sockets.emit("startGame", {
@@ -574,7 +687,7 @@ function handName(hand) {
     } else if (hand[0] === 1) {
         text = "One Pair, " + numToText(hand[1], true);
     } else {
-        text = numToText(hand[1], false) + "High";
+        text = numToText(hand[1], false) + " High";
     }
     return text;
 }

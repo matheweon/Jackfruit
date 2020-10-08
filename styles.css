@@ -44,12 +44,20 @@ body {
     background-color: #abcdff;
 }
 
+.cyan {
+    background-color: #80ffff !important;
+}
+
 .hover {
     border: 1vw solid #aaaaaa;
 }
 
 .selected {
     border: 1vw solid #ffff00;
+}
+
+.selectedOrange {
+    border: 1vw solid #ff7700;
 }
 
 .setHand {
@@ -65,7 +73,6 @@ body {
 
 .nextHand {
     font-size: 3.6vw;
-    background-color: #80ffff;
     color: #000000
 }
 
@@ -92,6 +99,22 @@ body {
 .points {
     font-size: 3vw;
     padding: 27% 13%;
+    background-color: #ccbbff;
+}
+
+.bottomText {
+    grid-column-start: 2;
+    grid-column-end: 7;
+    padding: 6.5% 0% 0% 0%;
+    font-size: 2.5vw;
+}
+
+.yellowText {
+    color: #ffff00;
+}
+
+.orangeText {
+    color: #ff7700;
 }
 
 /*body{

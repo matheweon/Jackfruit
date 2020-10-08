@@ -292,15 +292,13 @@ function findFlush(cards) {
                     for (var i = 0; i < 5; i++) {
                         fullHand[i] += suit;
                     }
-                    console.log("Royal Flush: " + fullHand);
                     return [9, fullHand]; // Royal Flush
                 } else if (straightFlush[1] === 5) { // Wheel Flush
                     var fullHand = ["A", "2", "3", "4", "5"];
                     for (var i = 0; i < 5; i++) {
                         fullHand[i] += suit;
                     }
-                    console.log("Wheel Flush: " + fullHand);
-                    return [8, straightFlush[1], fullHand];
+                    return [8, 5, fullHand];
                 } else {
                     var fullHand = [straightFlush[1], straightFlush[1]-1, straightFlush[1]-2, straightFlush[1]-3, straightFlush[1]-4];
                     for (var i = 0; i < 5; i++) {
@@ -318,7 +316,6 @@ function findFlush(cards) {
                         }
                         fullHand[i] += suit;
                     }
-                    console.log("Straight Flush: " + fullHand);
                     return [8, straightFlush[1], fullHand];
                 }
             }
@@ -348,14 +345,18 @@ function findFlush(cards) {
 function findStraight(cards) {
     suitlessCards = [];
     cards.forEach(function(card) {
-        suitlessCards.push(card[0]);
+        if (card[0] === undefined) { // Takes input in the form of [2, 3, 4, 5, 6]
+            suitlessCards.push(card);
+        } else { // Takes inputs in the form ["2♣", "3♣", "4♣", "5♣", "6♣"]
+            suitlessCards.push(card[0]);
+        }
     });
     convertToNumbers(suitlessCards);
     for (var i = 14; i > 5; i--) {
         if (suitlessCards.includes(i) && suitlessCards.includes(i-1) && suitlessCards.includes(i-2) && suitlessCards.includes(i-3) && suitlessCards.includes(i-4)) {
             var fullHand = [i, i-1, i-2, i-3, i-4];
-            for (var i = 0; i < 5; i++) {
-                fullHand[i] = cards[suitlessCards.indexOf(fullHand[i])];
+            for (var j = 0; j < 5; j++) {
+                fullHand[j] = cards[suitlessCards.indexOf(fullHand[j])];
             }
             return [4, i, fullHand];
         }
@@ -548,8 +549,9 @@ function river(roomCode) {
 }
 
 function endRound(roomCode) {
-    winningHands = [];
-    madeHands = [];
+    var winningHands = [];
+    var madeHands = [];
+    var handNames = [];
     community = gamesDictionary[roomCode]["flop"].slice()
     community.push(gamesDictionary[roomCode]["turn"]);
     community.push(gamesDictionary[roomCode]["river"]);
@@ -577,6 +579,15 @@ function endRound(roomCode) {
         // Push each fullHand into madeHands
         madeHands.push(findHand(hand1.concat(community))[findHand(hand1.concat(community)).length - 1]);
         madeHands.push(findHand(hand2.concat(community))[findHand(hand2.concat(community)).length - 1]);
+        // Push each hand name into handNames
+        handNames.push(handName(findHand(hand1.concat(community))));
+        handNames.push(handName(findHand(hand2.concat(community))));
+    }
+    // Clean up handNames (removes "a " from the beginning of the name)
+    for (var i = 0; i < 6; i++) {
+        if (handNames[i].substring(0, 2) === "a ") {
+            handNames[i] = handNames[i].substring(2);
+        }
     }
     console.log(winningHands);
     // Calculate total score and if a player scoops
@@ -587,15 +598,20 @@ function endRound(roomCode) {
     var scores = [];
     var scoreSum = 0;
     var scoop = false;
+    var handWinners = [];
+    var defaultText = "";
     for (var i = 0; i < 3; i++) {
         if (winningHands[i][0] === 1) { // If player 1 wins the hand
             scores.push(winningHands[i][2]);
             scoreSum += winningHands[i][2];
+            handWinners.push(1);
         } else if (winningHands[i][0] === 2) { // If player 2 wins the hand
             scores.push(-winningHands[i][2]);
             scoreSum -= winningHands[i][2];
+            handWinners.push(2);
         } else { // If tie
             scores.push(0);
+            handWinners.push(0);
         }
     }
     if (winningHands[0][0] === winningHands[1][0] && winningHands[0][0] === winningHands[2][0] && winningHands[0][0] !== 0) {
@@ -605,39 +621,44 @@ function endRound(roomCode) {
     if (winningHands[0][0] === 0) { // If tie
         topInfo = "Top Hand is a tie with " + handName(winningHands[0][1]) + "\n";
     } else {
-        topInfo = "Player " + winningHands[0][0] + " wins Top Hand with " + handName(winningHands[0][1]) + ". " + winningHands[0][2]/multipliers[0] + "x" + multipliers[0] + " = +" + winningHands[0][2] + " Points\n";
+        topInfo = "Player " + winningHands[0][0] + " wins Top Hand with " + handName(winningHands[0][1]) + ". " + winningHands[0][2]/multipliers[0] + "x" + multipliers[0] + " = " + winningHands[0][2] + " Points\n";
     }
     if (winningHands[1][0] === 0) { // If tie
         midInfo = "Middle Hand is a tie with " + handName(winningHands[1][1]) + "\n";
     } else {
-        midInfo = "Player " + winningHands[1][0] + " wins Middle Hand with " + handName(winningHands[1][1]) + ". " + winningHands[1][2]/multipliers[1] + "x" + multipliers[1] + " = +" + winningHands[1][2] + " Points\n";
+        midInfo = "Player " + winningHands[1][0] + " wins Middle Hand with " + handName(winningHands[1][1]) + ". " + winningHands[1][2]/multipliers[1] + "x" + multipliers[1] + " = " + winningHands[1][2] + " Points\n";
     }
     if (winningHands[2][0] === 0) { // If tie
         botInfo = "Bottom Hand is a tie with " + handName(winningHands[2][1]) + "\n";
     } else {
-        botInfo = "Player " + winningHands[2][0] + " wins Bottom Hand with " + handName(winningHands[2][1]) + ". " + winningHands[2][2]/multipliers[2] + "x" + multipliers[2] + " = +" + winningHands[2][2] + " Points\n";
+        botInfo = "Player " + winningHands[2][0] + " wins Bottom Hand with " + handName(winningHands[2][1]) + ". " + winningHands[2][2]/multipliers[2] + "x" + multipliers[2] + " = " + winningHands[2][2] + " Points\n";
     }
     // Give players their points
     if (scoreSum > 0) {
         if (scoop) {
             scoreSum += 30;
-            winInfo = "Player 1 scoops for a total of " + scores[0] + " + " + scores[1] + " + " + scores[2] + " + 30 (Scoop) = " + scoreSum + " Points";
+            winInfo = "Player 1 scoops for " + scores[0] + " + " + scores[1] + " + " + scores[2] + " + 30 (Scoop) = " + scoreSum + " Points";
+            defaultText = winInfo;
         } else {
-            winInfo = "Player 1 wins a total of " + scores[0] + " + " + scores[1] + " + " + scores[2] + " = " + scoreSum + " Points";
+            winInfo = "Player 1 wins " + scores[0] + " + " + scores[1] + " + " + scores[2] + " = " + scoreSum + " Points";
             winInfo = winInfo.split("+ -").join("- ");
+            defaultText = winInfo;
         }
         gamesDictionary[roomCode]["p1points"] += scoreSum;
     } else if (scoreSum < 0) {
         if (scoop) {
             scoreSum -= 30;
-            winInfo = "Player 2 scoops for a total of " + -scores[0] + " + " + -scores[1] + " + " + -scores[2] + " + 30 (Scoop) = " + -scoreSum + " Points";
+            winInfo = "Player 2 scoops for " + -scores[0] + " + " + -scores[1] + " + " + -scores[2] + " + 30 (Scoop) = " + -scoreSum + " Points";
+            defaultText = winInfo;
         } else {
-            winInfo = "Player 2 wins a total of " + -scores[0] + " + " + -scores[1] + " + " + -scores[2] + " = " + -scoreSum + " Points";
+            winInfo = "Player 2 wins " + -scores[0] + " + " + -scores[1] + " + " + -scores[2] + " = " + -scoreSum + " Points";
             winInfo = winInfo.split("+ -").join("- ");
+            defaultText = winInfo;
         }
         gamesDictionary[roomCode]["p2points"] -= scoreSum;
     } else {
-        winInfo = "It's a tie! Neither player wins any points."
+        winInfo = "It's a tie! Neither player wins any points.";
+        defaultText = winInfo;
     }
     var info = topInfo + midInfo + botInfo + winInfo;
     console.log(info);
@@ -647,7 +668,10 @@ function endRound(roomCode) {
         info: info,
         p1points: gamesDictionary[roomCode]["p1points"],
         p2points: gamesDictionary[roomCode]["p2points"],
-        madeHands: madeHands
+        madeHands: madeHands,
+        handWinners: handWinners,
+        handNames: handNames,
+        defaultText: defaultText
     });
 
     io.sockets.emit("startGame", {

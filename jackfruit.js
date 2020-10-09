@@ -142,21 +142,21 @@ socket.on("setHand", function(data) {
 
 socket.on("turn", function(data) {
     if (data.roomCode === currentRoom) {
-        infoText.innerHTML = data.info.replaceAll("\n", "<br>");
+        infoText.innerHTML = data.info.replace(/\n/g, "<br>");
         turn = data.turn;
     }
 })
 
 socket.on("river", function(data) {
     if (data.roomCode === currentRoom) {
-        infoText.innerHTML = infoText.innerHTML + data.info.replaceAll("\n", "<br>");
+        infoText.innerHTML = infoText.innerHTML + data.info.replace(/\n/g, "<br>");
         river = data.river;
     }
 })
 
 socket.on("endGame", function(data) {
     if (data.roomCode === currentRoom) {
-        infoText.innerHTML = infoText.innerHTML + data.info.replaceAll("\n", "<br>");
+        infoText.innerHTML = infoText.innerHTML + data.info.replace(/\n/g, "<br>");
         madeHands = data.madeHands;
         handWinners = data.handWinners;
         handNames = data.handNames;
